@@ -1,12 +1,11 @@
-# Live-Staffing-Calculator
+# Live Staffing Calculator
 
 An **Erlang-C based workforce planning tool** built in Python.  
-Given call volume and service targets, it calculates how many agents you need hour by hour.
+Interactive dashboard which takes inputs like call volume, AHT, SL%, and as output it calculates how many agents are needed every hour.
 
 ---
 
 ## What It Does
-
 | Input | Output |
 |---|---|
 | Average Handle Time (AHT) | Peak headcount to roster |
@@ -16,8 +15,7 @@ Given call volume and service targets, it calculates how many agents you need ho
 
 ---
 
-## Key Parameters
-
+## Key Input Parameters
 ```python
 AHT                  = 240    # Average Handle Time in seconds
 SERVICE_LEVEL_TARGET = 80     # Target: answer 80% of calls...
@@ -40,12 +38,9 @@ The calculator uses **Erlang-C queuing theory** the industry standard for call c
 | `ASA = P(wait) × AHT / (N − A)` | Average Speed of Answer |
 | `Headcount = ceil(N / (1 − shrinkage))` | Agents to roster |
 
-A full plain-English walkthrough is included in **Section 9** of the notebook.
-
 ---
 
 ## Output Files
-
 After running, the notebook generates:
 - **`staffing_results.csv`**  full intraday table
 - **`staffing_chart.png`**  headcount and service level charts
@@ -53,9 +48,8 @@ After running, the notebook generates:
 ---
 
 ## Tech Stack
-
 - Python 3.x
 - `pandas` - tabular results
 - `matplotlib` - charts
-- `math` - Erlang-C calculation (no external queuing library needed)
+- `math` - Erlang-C formulas (no external queuing library needed)
 ```
