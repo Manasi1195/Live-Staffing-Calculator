@@ -152,26 +152,24 @@ styled = (
 )
 st.dataframe(styled, use_container_width=True, hide_index=True)
 
-with st.expander("How It Works — Formula Walkthrough"):
+with st.expander("How It Works"):
     st.markdown("""
-**Step 1 — Traffic Intensity (Erlangs)**
+**Step 1: Traffic Intensity (Erlangs)**
 `A = (Calls per hour × AHT) / 3600`
-1 Erlang = 1 agent kept busy non-stop for a full hour.
 
-**Step 2 — Erlang-C: Probability a Caller Waits**
+**Step 2: Erlang-C: Call Wait Time**
 `P(wait) = ErlangC(N, A)`
 We try N = ceil(A)+1, N+1, N+2 ... until the service level target is met.
 
-**Step 3 — Service Level**
+**Step 3: Service Level**
 `SL = 1 − P(wait) × exp(−(N − A) × target_time / AHT)`
 
-**Step 4 — Average Speed of Answer**
+**Step 4: Average Speed of Answer**
 `ASA = P(wait) × AHT / (N − A)`
 
-**Step 5 — Utilisation**
-`Utilisation % = A / N × 100`  — keep below 85% to avoid queue build-up.
+**Step 5: Utilisation**
+`Utilisation % = A / N × 100`   keeping below 85% to avoid queue build-up.
 
-**Step 6 — Headcount with Shrinkage**
+**Step 6: Headcount with Shrinkage**
 `Headcount = ceil(N / (1 − shrinkage%))`
-Accounts for breaks, training, and sick days.
 """)
