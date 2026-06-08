@@ -1,13 +1,14 @@
 import math
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import streamlit as st
 
 st.set_page_config(page_title="Contact Center Staffing Calculator", layout="wide")
 
 BELL = [0.30,0.50,0.70,0.90,1.00,1.10,1.20,1.15,1.10,1.00,0.90,0.80,
         0.75,0.70,0.65,0.60,0.55,0.50,0.45,0.40,0.35,0.30,0.25,0.20]
+
+START_HOUR = 8  # always 8 AM
 
 def erlang_c(N, A):
     if N <= A: return 1.0
@@ -31,14 +32,15 @@ def min_agents(A, sl_pct, T, aht):
     return N
 
 def run_calculation(aht, sl_target, answer_time, op_hours, shrinkage, daily_calls):
-    start   = (24 - op_hours) // 2
-    weights = BELL[start: start + op_hours]
+    weights = BELL[START_HOUR: START_HOUR + op_hours]
     wsum    = sum(weights)
     calls_list = [round(daily_calls * w / wsum) for w in weights]
+
     labels = []
     for i in range(op_hours):
-        h = start + i
+        h = START_HOUR + i
         labels.append(f"{h % 12 or 12}:00 {'AM' if h < 12 else 'PM'}")
+
     rows = []
     for i, calls in enumerate(calls_list):
         if calls == 0:
@@ -70,39 +72,45 @@ with st.sidebar:
     aht         = st.slider("Average Handle Time — AHT (sec)", 30, 600, 240, 10)
     sl_target   = st.slider("Target Service Level (%)", 50, 99, 80)
     answer_time = st.slider("Target Answer Time (sec)", 5, 60, 20)
-    op_hours    = st.slider("Operating Hours per Day", 4, 24, 12)
+    op_hours    = st.slider("Operating Hours per Day", 4, 24, 9)
     shrinkage   = st.slider("Shrinkage (%)", 5, 50, 20)
     daily_calls = st.number_input("Total Daily Call Volume", min_value=1, max_value=100000, value=1200, step=100)
     st.divider()
+    end_hour = START_HOUR + op_hours
+    end_h    = end_hour % 12 or 12
+    end_sfx  = "AM" if end_hour < 12 else "PM"
+    st.caption(f"Schedule window: **8:00 AM – {end_h}:00 {end_sfx}**")
+    if op_hours < 8:
+        st.caption("_Working hours below 8 may impact attendance._")
     st.caption("Adjust any value — the dashboard updates instantly.")
 
 shrinkage_dec = shrinkage / 100
 df     = run_calculation(aht, sl_target, answer_time, op_hours, shrinkage_dec, daily_calls)
 active = df[df["Calls"] > 0]
 
-peak_hc  = int(df["Headcount"].max())
-avg_sl   = active["Service Level %"].mean()
-avg_asa  = active["ASA (sec)"].mean()
-avg_util = active["Utilisation %"].mean()
+total_agents = int(df["Headcount"].max())
+avg_sl       = active["Service Level %"].mean()
+avg_asa      = active["ASA (sec)"].mean()
+avg_util     = active["Utilisation %"].mean()
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Peak Headcount", peak_hc,        f"+{shrinkage}% shrinkage")
-c2.metric("Avg Service Level", f"{avg_sl:.1f}%",   f"target {sl_target}%")
-c3.metric("Avg Speed of Answer", f"{avg_asa:.0f}s")
-c4.metric("Avg Utilisation",   f"{avg_util:.1f}%", "HIGH — review" if avg_util > 85 else "Healthy")
+c1.metric("Total Agents Required Today", total_agents, f"+{shrinkage}% shrinkage")
+c2.metric("Avg Service Level",           f"{avg_sl:.1f}%",  f"target {sl_target}%")
+c3.metric("Avg Speed of Answer",         f"{avg_asa:.0f}s")
+c4.metric("Avg Utilisation",             f"{avg_util:.1f}%", "HIGH — review" if avg_util > 85 else "Healthy")
 
 st.divider()
 
 col_chart1, col_chart2 = st.columns(2)
+x = list(range(len(df)))
 
 with col_chart1:
     fig1, ax1 = plt.subplots(figsize=(7, 4))
     fig1.patch.set_facecolor("#f5f6fa")
     ax1.set_facecolor("#f5f6fa")
-    x = range(len(df))
     ax1.bar([i - 0.2 for i in x], df["Headcount"],  width=0.38, color="#378ADD", label="Headcount (rostered)")
     ax1.bar([i + 0.2 for i in x], df["Min Agents"], width=0.38, color="#9FE1CB", label="Min Agents (Erlang-C)")
-    ax1.set_xticks(list(x))
+    ax1.set_xticks(x)
     ax1.set_xticklabels(df["Hour"], rotation=45, ha="right", fontsize=8)
     ax1.set_ylabel("Agents")
     ax1.set_title("Intraday Staffing Requirements", fontweight="bold")
@@ -117,12 +125,12 @@ with col_chart2:
     fig2.patch.set_facecolor("#f5f6fa")
     ax2.set_facecolor("#f5f6fa")
     ax2b = ax2.twinx()
-    ax2.bar(list(x), df["Calls"], color="#E8ECF5", label="Calls")
-    ax2b.plot(list(x), df["Service Level %"], color="#185FA5", marker="o", markersize=5, linewidth=2, label="SL %")
+    ax2.bar(x, df["Calls"], color="#E8ECF5", label="Calls")
+    ax2b.plot(x, df["Service Level %"], color="#185FA5", marker="o", markersize=5, linewidth=2, label="SL %")
     ax2b.axhline(sl_target, color="#E05A5A", linestyle="--", linewidth=1.5, label=f"Target ({sl_target}%)")
     ax2b.set_ylim(0, 115)
     ax2b.set_ylabel("Service Level %")
-    ax2.set_xticks(list(x))
+    ax2.set_xticks(x)
     ax2.set_xticklabels(df["Hour"], rotation=45, ha="right", fontsize=8)
     ax2.set_ylabel("Call Volume")
     ax2.set_title("Call Volume vs Service Level", fontweight="bold")
@@ -136,12 +144,17 @@ with col_chart2:
 
 st.divider()
 st.subheader("Intraday Staffing Breakdown")
+st.caption(
+    "Each row shows one operating hour. **Erlangs** = traffic load that hour "
+    "(calls × AHT ÷ 3600). **Min Agents** = the smallest number of agents that meets "
+    "your service level target, found by Erlang-C. **Headcount** = Min Agents inflated "
+    f"by {shrinkage}% shrinkage to cover breaks and absent staff. "
+    "Green = SL met · Red = SL missed · Amber = utilisation above 85%."
+)
 
 def colour_row(row):
-    sl  = row["Service Level %"]
-    ut  = row["Utilisation %"]
-    sl_colour = "background-color: #d4edda" if sl >= sl_target else "background-color: #f8d7da"
-    ut_colour = "background-color: #fff3cd" if ut > 85 else ""
+    sl_colour = "background-color: #d4edda" if row["Service Level %"] >= sl_target else "background-color: #f8d7da"
+    ut_colour = "background-color: #fff3cd" if row["Utilisation %"] > 85 else ""
     return ["", "", "", "", "", ut_colour, "", sl_colour]
 
 styled = (
